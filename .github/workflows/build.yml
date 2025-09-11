@@ -1,0 +1,103 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        compiler:
+          - cxx: clang++
+            cc: clang
+          - cxx: g++
+            cc: gcc
+        include:
+          - os: windows-latest
+            cxx: msvc
+
+    env:
+      BUILD_TYPE: Debug
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MariaDB
+      uses: ankane/setup-mariadb@v1
+
+    # Dependencies
+    - name: "[Linux] Install system dependencies"
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common cmake libmariadb-dev-compat
+
+    - name: "[macOS] Install system dependencies"
+      if: runner.os == 'macOS'
+      run: |
+        brew install llvm gcc mariadb
+
+    # CMake dependency src caching
+    - name: Cache CMake dependency source code
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-cmake-dependency-sources
+      with:
+        path: |
+          ${{github.workspace}}/build/_deps/*-src
+        key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        restore-keys: |
+          ${{ env.cache-name }}-${{ matrix.os }}-${{ matrix.compiler.cxx }}
+
+    # CMake dependency build caching
+    - name: Cache CMake dependency build objects
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-cmake-dependency-builds
+      with:
+        path: |
+          ${{github.workspace}}/build/_deps/*-build
+          ${{github.workspace}}/build/_deps/*-subbuild
+        key: ${{ env.cache-name }}-${{ matrix.os }}-${{ matrix.compiler.cxx }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        restore-keys: |
+          ${{ env.cache-name }}-${{ matrix.os }}-${{ matrix.compiler.cxx }}
+
+    # Configure CMake
+    - name: Configure CMake
+      env:
+        CXX: ${{ matrix.compiler.cxx }}
+        CC: ${{ matrix.compiler.cc }}
+      run: cmake -B build -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+
+    # Build with CMake
+    - name: Build
+      run: cmake --build build --config $BUILD_TYPE -j4
+
+    - name: "Run tests"
+      if: runner.os != 'Windows'
+      run: |
+        ./build/test/ct-sql-test
+    
+    - name: "[windows] Run tests"
+      if: runner.os == 'Windows'
+      env:
+        CT_SQL_USER: runneradmin
+      run: |
+        ./build/test/Debug/ct-sql-test.exe
