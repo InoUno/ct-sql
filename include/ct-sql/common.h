@@ -6,6 +6,12 @@
 
 namespace ct_sql
 {
+    template <size_t N>
+    struct StringLiteral;
+
+    template <size_t N1, size_t N2>
+    static constexpr StringLiteral<N1 + N2 - 1> ConcatLiterals(const char (&str1)[N1], const char (&str2)[N2]);
+
     // Compile-time string literal wrapper
     template <size_t N>
     struct StringLiteral
@@ -13,6 +19,16 @@ namespace ct_sql
         constexpr StringLiteral(const char (&str)[N])
         {
             std::copy_n(str, N, value);
+        }
+
+        constexpr StringLiteral()
+        {
+        }
+
+        template <size_t N2>
+        constexpr ct_sql::StringLiteral<N + N2 - 1> append(const char (&str2)[N2]) const
+        {
+            return ConcatLiterals(this->value, str2);
         }
 
         char value[N];
@@ -31,6 +47,15 @@ namespace ct_sql
             return { value, N - 1 };
         }
     };
+
+    template <size_t N1, size_t N2>
+    static constexpr StringLiteral<N1 + N2 - 1> ConcatLiterals(const char (&str1)[N1], const char (&str2)[N2])
+    {
+        StringLiteral<N1 + N2 - 1> literal;
+        std::copy_n(str1, N1 - 1, literal.value);
+        std::copy_n(str2, N2, literal.value + N1 - 1);
+        return literal;
+    }
 
     /*
      * Proxies for getters on rows

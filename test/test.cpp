@@ -222,6 +222,20 @@ TEST(InvalidQueries, MissingArgument)
     ASSERT_FALSE(res);
 }
 
+TEST(StringLiteral, Concatenation)
+{
+    constexpr auto first = StringLiteral("SELECT tiny,");
+    constexpr auto full  = first.append(" small FROM __ct_sql_test_rows LIMIT 1;");
+    auto res             = g_conn->execute<full>();
+    ASSERT_TRUE(res);
+    auto row = res->next();
+    ASSERT_TRUE(row);
+
+    // Compile-time checks still work for the columns
+    uint8_t tiny   = row->get<"tiny">();
+    uint16_t small = row->get<"small">();
+}
+
 static void setup_database(MySqlConnection* conn)
 {
     if (auto res = conn->execute("DROP DATABASE IF EXISTS __ct_sql_test;"); !res)
