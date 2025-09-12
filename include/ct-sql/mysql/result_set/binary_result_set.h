@@ -19,6 +19,7 @@ namespace ct_sql
     private:
         MYSQL_STMT* stmt_;
         MYSQL_RES* metadata_;
+        MYSQL_FIELD* fields_;
 
         // Only used and populated, if columns are gotten via regular string arguments.
         std::unordered_map<std::string, size_t> column_map_;
@@ -33,6 +34,7 @@ namespace ct_sql
         inline explicit MySqlBinaryResultSet(MYSQL_STMT* stmt)
         : stmt_(stmt)
         , metadata_(nullptr)
+        , fields_(nullptr)
         {
             if (stmt_)
             {
@@ -41,6 +43,7 @@ namespace ct_sql
                 {
                     return;
                 }
+                fields_ = mysql_fetch_fields(metadata_);
 
                 std::memset(&bind_, 0, sizeof(bind_));
                 bind_.buffer        = &buffer_;
@@ -82,7 +85,7 @@ namespace ct_sql
 
         inline std::optional<MySqlBinaryRow<Query>> next()
         {
-            if (!stmt_)
+            if (!stmt_ || !fields_)
             {
                 return std::nullopt;
             }
@@ -93,7 +96,7 @@ namespace ct_sql
                 return std::nullopt;
             }
 
-            return std::make_optional<MySqlBinaryRow<Query>>(stmt_, metadata_->fields, bind_, column_map_);
+            return std::make_optional<MySqlBinaryRow<Query>>(stmt_, fields_, bind_, column_map_);
         }
 
         inline constexpr size_t column_count() const
@@ -112,13 +115,13 @@ namespace ct_sql
         }
 
         template <size_t ColumnIndex>
-        constexpr std::string_view column_name()
+        static constexpr std::string_view column_name()
         {
             return QueryColumns::template column_name<ColumnIndex>();
         }
 
         template <StringLiteral ColumnName>
-        constexpr size_t column_index()
+        static constexpr size_t column_index()
         {
             return QueryColumns::template column_index<ColumnName>();
         }

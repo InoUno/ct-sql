@@ -25,5 +25,13 @@ namespace ct_sql
         , MySqlComptimeRowBase<MySqlBinaryRow<Query>, Query>(fields, column_map)
         {
         }
+
+        // Copyable
+        MySqlBinaryRow(const MySqlBinaryRow&) = default;
+        MySqlBinaryRow& operator=(const MySqlBinaryRow&) = default;
+
+        // Movable
+        inline MySqlBinaryRow(MySqlBinaryRow&& other) = default;
+        inline MySqlBinaryRow& operator=(MySqlBinaryRow&& other) = default;
     };
 }

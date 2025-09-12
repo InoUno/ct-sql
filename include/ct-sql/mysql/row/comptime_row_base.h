@@ -49,6 +49,14 @@ namespace ct_sql
         {
         }
 
+        // Copyable
+        MySqlComptimeRowBase(const MySqlComptimeRowBase&) = default;
+        MySqlComptimeRowBase& operator=(const MySqlComptimeRowBase&) = default;
+
+        // Movable
+        inline MySqlComptimeRowBase(MySqlComptimeRowBase&& other) = default;
+        inline MySqlComptimeRowBase& operator=(MySqlComptimeRowBase&& other) = default;
+
         static constexpr size_t column_count()
         {
             return QueryColumns::column_count;
@@ -253,33 +261,33 @@ namespace ct_sql
          */
 
         template <StringLiteral ColumnName, typename T>
-        inline size_t copy_to(T* target, size_t size)
+        inline size_t copy_to(T* target, size_t size) const
         {
             constexpr size_t index = QueryColumns::template column_index<ColumnName>();
             return as_derived()->template copy_to_unchecked<T>(index, target, size);
         }
 
         template <StringLiteral ColumnName, typename T, size_t N>
-        inline size_t copy_to(T (&target)[N])
+        inline size_t copy_to(T (&target)[N]) const
         {
             return copy_to<ColumnName, T>(target, sizeof(T) * N);
         }
 
         template <StringLiteral ColumnName, typename T, size_t N>
-        inline size_t copy_to(std::array<T, N>& target)
+        inline size_t copy_to(std::array<T, N>& target) const
         {
             return copy_to<ColumnName, T>(target.data(), sizeof(T) * N);
         }
 
         template <StringLiteral ColumnName, typename T>
-        inline size_t copy_to(std::vector<T>& target)
+        inline size_t copy_to(std::vector<T>& target) const
         {
             constexpr size_t index = QueryColumns::template column_index<ColumnName>();
             return as_derived()->template copy_to_unchecked<T>(index, target);
         }
 
         template <typename T>
-        inline size_t copy_to(std::string_view column, T* target, size_t size)
+        inline size_t copy_to(std::string_view column, T* target, size_t size) const
         {
             ensure_populated_column_map();
 
@@ -293,19 +301,19 @@ namespace ct_sql
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(std::string_view column, T (&target)[N])
+        inline size_t copy_to(std::string_view column, T (&target)[N]) const
         {
             return copy_to<T>(column, target, sizeof(T) * N);
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(std::string_view column, std::array<T, N>& target)
+        inline size_t copy_to(std::string_view column, std::array<T, N>& target) const
         {
             return copy_to<T>(column, target.data(), sizeof(T) * N);
         }
 
         template <typename T>
-        inline size_t copy_to(std::string_view column, std::vector<T>& target)
+        inline size_t copy_to(std::string_view column, std::vector<T>& target) const
         {
             ensure_populated_column_map();
 
@@ -319,33 +327,33 @@ namespace ct_sql
         }
 
         template <size_t Index, typename T>
-        inline size_t copy_to(T* target, size_t size)
+        inline size_t copy_to(T* target, size_t size) const
         {
             static_assert(Index >= 0 && Index < QueryColumns::column_count, "Index is out of range for the query.");
             return as_derived()->template copy_to_unchecked<T>(Index, target, size);
         }
 
         template <size_t Index, typename T, size_t N>
-        inline size_t copy_to(T (&target)[N])
+        inline size_t copy_to(T (&target)[N]) const
         {
             return copy_to<Index, T>(target, sizeof(T) * N);
         }
 
         template <size_t Index, typename T, size_t N>
-        inline size_t copy_to(std::array<T, N>& target)
+        inline size_t copy_to(std::array<T, N>& target) const
         {
             return copy_to<Index, T>(target.data(), sizeof(T) * N);
         }
 
         template <size_t Index, typename T>
-        inline size_t copy_to(std::vector<T>& target)
+        inline size_t copy_to(std::vector<T>& target) const
         {
             static_assert(Index >= 0 && Index < QueryColumns::column_count, "Index is out of range for the query.");
             return as_derived()->template copy_to_unchecked<T>(Index, target);
         }
 
         template <typename T>
-        inline size_t copy_to(size_t index, T* target, size_t size)
+        inline size_t copy_to(size_t index, T* target, size_t size) const
         {
             if (index < 0 || index >= QueryColumns::column_count)
             {
@@ -356,19 +364,19 @@ namespace ct_sql
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(size_t index, T (&target)[N])
+        inline size_t copy_to(size_t index, T (&target)[N]) const
         {
             return copy_to<T>(index, target, sizeof(T) * N);
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(size_t index, std::array<T, N>& target)
+        inline size_t copy_to(size_t index, std::array<T, N>& target) const
         {
             return copy_to<T>(index, target.data(), sizeof(T) * N);
         }
 
         template <typename T>
-        inline size_t copy_to(size_t index, std::vector<T>& target)
+        inline size_t copy_to(size_t index, std::vector<T>& target) const
         {
             if (index < 0 || index >= QueryColumns::column_count)
             {

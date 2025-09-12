@@ -578,7 +578,17 @@ namespace ct_sql
                 bind.buffer        = (void*)str_data_holder.back().c_str();
                 bind.buffer_length = str_data_holder.back().length();
             }
-            else if constexpr (std::is_same_v<First, int> || std::is_same_v<First, short> || std::is_same_v<First, unsigned int> || std::is_same_v<First, unsigned short>)
+            else if constexpr (std::is_same_v<First, char> || std::is_same_v<First, unsigned char>)
+            {
+                bind.buffer_type = MYSQL_TYPE_TINY;
+                bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
+            }
+            else if constexpr (std::is_same_v<First, short> || std::is_same_v<First, unsigned short>)
+            {
+                bind.buffer_type = MYSQL_TYPE_SHORT;
+                bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
+            }
+            else if constexpr (std::is_same_v<First, int> || std::is_same_v<First, unsigned int>)
             {
                 bind.buffer_type = MYSQL_TYPE_LONG;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));

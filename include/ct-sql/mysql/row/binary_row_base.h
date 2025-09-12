@@ -27,6 +27,14 @@ namespace ct_sql
         {
         }
 
+        // Copyable
+        MySqlBinaryRowBase(const MySqlBinaryRowBase&) = default;
+        MySqlBinaryRowBase& operator=(const MySqlBinaryRowBase&) = default;
+
+        // Movable
+        inline MySqlBinaryRowBase(MySqlBinaryRowBase&& other) = default;
+        inline MySqlBinaryRowBase& operator=(MySqlBinaryRowBase&& other) = default;
+
         template <typename T>
         inline T get_unchecked(size_t index) const
         {

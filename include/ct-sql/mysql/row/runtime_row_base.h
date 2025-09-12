@@ -208,31 +208,31 @@ namespace ct_sql
          */
 
         template <StringLiteral ColumnName, typename T>
-        inline size_t copy_to(T* target, size_t size)
+        inline size_t copy_to(T* target, size_t size) const
         {
             return copy_to<T>(ColumnName.view(), target, size);
         }
 
         template <StringLiteral ColumnName, typename T, size_t N>
-        inline size_t copy_to(T (&target)[N])
+        inline size_t copy_to(T (&target)[N]) const
         {
             return copy_to<ColumnName, T>(target, sizeof(T) * N);
         }
 
         template <StringLiteral ColumnName, typename T, size_t N>
-        inline size_t copy_to(std::array<T, N>& target)
+        inline size_t copy_to(std::array<T, N>& target) const
         {
             return copy_to<ColumnName, T>(target.data(), sizeof(T) * N);
         }
 
         template <StringLiteral ColumnName, typename T>
-        inline size_t copy_to(std::vector<T>& target)
+        inline size_t copy_to(std::vector<T>& target) const
         {
             return copy_to<T>(ColumnName.view(), target);
         }
 
         template <typename T>
-        inline size_t copy_to(std::string_view column, T* target, size_t size)
+        inline size_t copy_to(std::string_view column, T* target, size_t size) const
         {
             const auto index = column_map_.find(column.data());
             if (index == column_map_.end())
@@ -244,19 +244,19 @@ namespace ct_sql
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(std::string_view column, T (&target)[N])
+        inline size_t copy_to(std::string_view column, T (&target)[N]) const
         {
             return copy_to<T>(column, target, sizeof(T) * N);
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(std::string_view column, std::array<T, N>& target)
+        inline size_t copy_to(std::string_view column, std::array<T, N>& target) const
         {
             return copy_to<T>(column, target.data(), sizeof(T) * N);
         }
 
         template <typename T>
-        inline size_t copy_to(std::string_view column, std::vector<T>& target)
+        inline size_t copy_to(std::string_view column, std::vector<T>& target) const
         {
             const auto index = column_map_.find(column.data());
             if (index == column_map_.end())
@@ -268,31 +268,31 @@ namespace ct_sql
         }
 
         template <size_t Index, typename T>
-        inline size_t copy_to(T* target, size_t size)
+        inline size_t copy_to(T* target, size_t size) const
         {
             return copy_to<T>(Index, target, size);
         }
 
         template <size_t Index, typename T, size_t N>
-        inline size_t copy_to(T (&target)[N])
+        inline size_t copy_to(T (&target)[N]) const
         {
             return copy_to<T>(Index, target, sizeof(T) * N);
         }
 
         template <size_t Index, typename T, size_t N>
-        inline size_t copy_to(std::array<T, N>& target)
+        inline size_t copy_to(std::array<T, N>& target) const
         {
             return copy_to<T>(Index, target.data(), sizeof(T) * N);
         }
 
         template <size_t Index, typename T>
-        inline size_t copy_to(std::vector<T>& target)
+        inline size_t copy_to(std::vector<T>& target) const
         {
             return copy_to<T>(Index, target);
         }
 
         template <typename T>
-        inline size_t copy_to(size_t index, T* target, size_t size)
+        inline size_t copy_to(size_t index, T* target, size_t size) const
         {
             if (index < 0 || index >= column_count())
             {
@@ -303,19 +303,19 @@ namespace ct_sql
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(size_t index, T (&target)[N])
+        inline size_t copy_to(size_t index, T (&target)[N]) const
         {
             return copy_to<T>(index, target, sizeof(T) * N);
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to(size_t index, std::array<T, N>& target)
+        inline size_t copy_to(size_t index, std::array<T, N>& target) const
         {
             return copy_to<T>(index, target.data(), sizeof(T) * N);
         }
 
         template <typename T>
-        inline size_t copy_to(size_t index, std::vector<T>& target)
+        inline size_t copy_to(size_t index, std::vector<T>& target) const
         {
             if (index < 0 || index >= column_count())
             {

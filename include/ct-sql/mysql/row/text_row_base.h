@@ -44,13 +44,13 @@ namespace ct_sql
             return { parse_column<T>(index) };
         }
 
-        inline size_t byte_length_unchecked(size_t index)
+        inline size_t byte_length_unchecked(size_t index) const
         {
             return this->lengths_[index];
         }
 
         template <typename T>
-        inline size_t copy_to_unchecked(size_t index, T* target, size_t size)
+        inline size_t copy_to_unchecked(size_t index, T* target, size_t size) const
         {
             const size_t source_size = this->lengths_[index];
             const size_t copy_size   = std::min(source_size, size);
@@ -61,7 +61,7 @@ namespace ct_sql
         }
 
         template <typename T, size_t N>
-        inline size_t copy_to_unchecked(size_t index, T (&target)[N])
+        inline size_t copy_to_unchecked(size_t index, T (&target)[N]) const
         {
             return copy_to_unchecked<T>(index, target, sizeof(T) * N);
         }
@@ -96,6 +96,13 @@ namespace ct_sql
             else if constexpr (std::is_integral_v<T>)
             {
                 return static_cast<T>(strtoul(this->row_[index], NULL, 10));
+            }
+            else if constexpr (std::is_enum_v<T>)
+            {
+                if constexpr (std::is_integral_v<std::underlying_type_t<T>>)
+                {
+                    return static_cast<T>(strtoul(this->row_[index], NULL, 10));
+                }
             }
             else if constexpr (std::is_floating_point_v<T>)
             {
