@@ -563,14 +563,19 @@ namespace ct_sql
             MYSQL_BIND& bind = binds[index];
             std::memset(&bind, 0, sizeof(bind));
 
-            if constexpr (std::is_same_v<First, const char*>)
+            using FirstUnpacked = typename std::conditional<
+                std::is_enum_v<First>,
+                std::underlying_type<First>,
+                std::type_identity<First>>::type::type;
+
+            if constexpr (std::is_same_v<FirstUnpacked, const char*>)
             {
                 // const char* can be used directly as the buffer, since it's lifetime is static
                 bind.buffer_type   = MYSQL_TYPE_STRING;
                 bind.buffer        = (void*)current_param;
                 bind.buffer_length = strlen(current_param);
             }
-            else if constexpr (std::is_same_v<First, std::string> || std::is_same_v<First, std::string_view>)
+            else if constexpr (std::is_same_v<FirstUnpacked, std::string> || std::is_same_v<FirstUnpacked, std::string_view>)
             {
                 // Store a copy of the string to a vector to ensure its lifetime
                 str_data_holder.push_back(current_param);
@@ -578,32 +583,32 @@ namespace ct_sql
                 bind.buffer        = (void*)str_data_holder.back().c_str();
                 bind.buffer_length = str_data_holder.back().length();
             }
-            else if constexpr (std::is_same_v<First, char> || std::is_same_v<First, unsigned char>)
+            else if constexpr (std::is_same_v<FirstUnpacked, char> || std::is_same_v<FirstUnpacked, unsigned char>)
             {
                 bind.buffer_type = MYSQL_TYPE_TINY;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
             }
-            else if constexpr (std::is_same_v<First, short> || std::is_same_v<First, unsigned short>)
+            else if constexpr (std::is_same_v<FirstUnpacked, short> || std::is_same_v<FirstUnpacked, unsigned short>)
             {
                 bind.buffer_type = MYSQL_TYPE_SHORT;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
             }
-            else if constexpr (std::is_same_v<First, int> || std::is_same_v<First, unsigned int>)
+            else if constexpr (std::is_same_v<FirstUnpacked, int> || std::is_same_v<FirstUnpacked, unsigned int>)
             {
                 bind.buffer_type = MYSQL_TYPE_LONG;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
             }
-            else if constexpr (std::is_same_v<First, long> || std::is_same_v<First, long long> || std::is_same_v<First, unsigned long> || std::is_same_v<First, unsigned long long>)
+            else if constexpr (std::is_same_v<FirstUnpacked, long> || std::is_same_v<FirstUnpacked, long long> || std::is_same_v<FirstUnpacked, unsigned long> || std::is_same_v<FirstUnpacked, unsigned long long>)
             {
                 bind.buffer_type = MYSQL_TYPE_LONGLONG;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
             }
-            else if constexpr (std::is_same_v<First, float>)
+            else if constexpr (std::is_same_v<FirstUnpacked, float>)
             {
                 bind.buffer_type = MYSQL_TYPE_FLOAT;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
             }
-            else if constexpr (std::is_same_v<First, double>)
+            else if constexpr (std::is_same_v<FirstUnpacked, double>)
             {
                 bind.buffer_type = MYSQL_TYPE_DOUBLE;
                 bind.buffer      = const_cast<void*>(reinterpret_cast<const void*>(&current_param));
@@ -611,10 +616,10 @@ namespace ct_sql
             else
             {
                 // Handle unsupported types by raising an error
-                static_assert(std::is_same_v<First, void*>, "Unsupported parameter type detected.");
+                static_assert(std::is_same_v<FirstUnpacked, void*>, "Unsupported parameter type detected.");
             }
 
-            if constexpr (std::is_unsigned_v<First>)
+            if constexpr (std::is_unsigned_v<FirstUnpacked>)
             {
                 bind.is_unsigned = true;
             }
