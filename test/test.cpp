@@ -108,7 +108,7 @@ TEST(Select, RowCount)
     EXPECT_EQ(res->get_row_count(), 5);
 }
 
-TEST(Select, AffectedRowCount)
+TEST(Update, AffectedRowCount)
 {
     auto res_count = g_conn->execute("SELECT COUNT(*) FROM __ct_sql_test_rows WHERE id < 5;");
     ASSERT_TRUE(res_count);
@@ -149,7 +149,29 @@ TEST(GetOptional, Misc)
     EXPECT_FALSE((row2->get_opt<int>(0).has_value()));
 }
 
-TEST(ColumnTypes, Blob)
+TEST(ColumnTypes, StringParamater)
+{
+    std::string str = "John";
+    auto res        = g_conn->prepared<"SELECT 1 FROM __ct_sql_test_rows WHERE firstname = ?;">(str);
+    ASSERT_TRUE(res);
+    ASSERT_TRUE(res->get_row_count() > 0);
+
+    const char* c_arr = "John";
+    res               = g_conn->prepared<"SELECT 1 FROM __ct_sql_test_rows WHERE firstname = ?;">(c_arr);
+    ASSERT_TRUE(res);
+    ASSERT_TRUE(res->get_row_count() > 0);
+
+    std::string_view str_view = "John";
+    res                       = g_conn->prepared<"SELECT 1 FROM __ct_sql_test_rows WHERE firstname = ?;">(str_view);
+    ASSERT_TRUE(res);
+    ASSERT_TRUE(res->get_row_count() > 0);
+
+    res = g_conn->prepared<"SELECT 1 FROM __ct_sql_test_rows WHERE firstname = ?;">("John");
+    ASSERT_TRUE(res);
+    ASSERT_TRUE(res->get_row_count() > 0);
+}
+
+TEST(ColumnTypes, BlobSelect)
 {
     auto res = g_conn->prepared<"SELECT blobby FROM __ct_sql_test_rows LIMIT 1;">();
     ASSERT_TRUE(res);
@@ -208,6 +230,15 @@ TEST(InvalidQueries, BadQuery)
 {
     auto res = g_conn->execute("not a valid query;");
     ASSERT_FALSE(res);
+}
+
+TEST(InvalidQueries, BadPreparedQueryRetry)
+{
+    for (size_t i = 0; i < 3; i++)
+    {
+        auto res = g_conn->prepared<"SELECT not_a_column FROM __ct_sql_test_rows WHERE firstname = ?;">(1);
+        ASSERT_FALSE(res);
+    }
 }
 
 TEST(InvalidQueries, NonExistentColumn)

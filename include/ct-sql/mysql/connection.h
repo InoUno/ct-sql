@@ -380,13 +380,14 @@ namespace ct_sql
                 }
             }
 
+            // Use a vector to manage the lifetime of temporary string data, as the number of strings is not known at compile-time.
+            std::vector<std::string> str_data_holder;
+
             if constexpr (sizeof...(Args) > 0)
             {
                 // Use a fixed-size array on the stack for the binds, since the number of arguments is known at compile-time.
                 MYSQL_BIND binds[sizeof...(Args)];
 
-                // Use a vector to manage the lifetime of temporary string data, as the number of strings is not known at compile-time.
-                std::vector<std::string> str_data_holder;
                 size_t index = 0;
 
                 // Build the binds array recursively
@@ -558,30 +559,37 @@ namespace ct_sql
 
         // Recursive case: processes one parameter and then calls itself with the rest.
         template <typename First, typename... Rest>
-        inline void bind_params_recursive(MYSQL_BIND* binds, size_t& index, std::vector<std::string>& str_data_holder, const First& current_param, const Rest&... rest)
+        inline void bind_params_recursive(MYSQL_BIND* binds, size_t& index, std::vector<std::string>& str_data_holder, First& current_param, Rest&... rest)
         {
             MYSQL_BIND& bind = binds[index];
             std::memset(&bind, 0, sizeof(bind));
 
-            using FirstUnpacked = typename std::conditional<
+            using FirstUnpacked = std::remove_cv_t<std::remove_reference_t<typename std::conditional<
                 std::is_enum_v<First>,
                 std::underlying_type<First>,
-                std::type_identity<First>>::type::type;
+                std::type_identity<First>>::type::type>>;
 
-            if constexpr (std::is_same_v<FirstUnpacked, const char*>)
+            if constexpr (std::is_same_v<First, const char*> || (std::is_array_v<First> && std::is_same_v<std::remove_extent_t<First>, const char>))
             {
-                // const char* can be used directly as the buffer, since it's lifetime is static
+                // const char* and const char[] can be used directly as the buffer, since the lifetime is static
                 bind.buffer_type   = MYSQL_TYPE_STRING;
                 bind.buffer        = (void*)current_param;
-                bind.buffer_length = strlen(current_param);
+                bind.buffer_length = static_cast<unsigned long>(strlen(current_param));
             }
             else if constexpr (std::is_same_v<FirstUnpacked, std::string> || std::is_same_v<FirstUnpacked, std::string_view>)
             {
                 // Store a copy of the string to a vector to ensure its lifetime
-                str_data_holder.push_back(current_param);
+                if constexpr (std::is_same_v<FirstUnpacked, std::string_view>)
+                {
+                    str_data_holder.push_back(std::string(current_param.data()));
+                }
+                else
+                {
+                    str_data_holder.push_back(current_param);
+                }
                 bind.buffer_type   = MYSQL_TYPE_STRING;
                 bind.buffer        = (void*)str_data_holder.back().c_str();
-                bind.buffer_length = str_data_holder.back().length();
+                bind.buffer_length = static_cast<unsigned long>(str_data_holder.back().length());
             }
             else if constexpr (std::is_same_v<FirstUnpacked, char> || std::is_same_v<FirstUnpacked, unsigned char>)
             {
