@@ -180,7 +180,7 @@ static void setup_database(MySqlConnection* conn)
         throw std::runtime_error(std::format("Error during query: {}", res.error));
     }
 
-    if (auto res = conn->execute("USE __ct_sql_bench;"); !res)
+    if (auto res = conn->use_database("__ct_sql_bench"); !res)
     {
         throw std::runtime_error(std::format("Error during query: {}", res.error));
     }

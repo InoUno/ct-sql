@@ -192,6 +192,16 @@ namespace ct_sql
             return 3600;
         }
 
+        inline CtResult<bool> use_database(std::string_view db)
+        {
+            if (auto res = execute(std::format("USE `{}`;", db)); !res)
+            {
+                return res.error;
+            }
+            db_ = db;
+            return true;
+        }
+
         inline bool ping()
         {
             return mysql_ping(&this->handle_) == 0;
@@ -227,13 +237,12 @@ namespace ct_sql
             return result != nullptr;
         }
 
-        inline static std::unique_ptr<MySqlConnection> make(const char* user, const char* passwd, const char* host, uint16_t port, const char* db)
+        inline static CtResult<std::unique_ptr<MySqlConnection>> make(const char* user, const char* passwd, const char* host, uint16_t port, const char* db)
         {
             auto conn = std::make_unique<MySqlConnection>();
             if (!conn->connect(user, passwd, host, port, db))
             {
-                auto error_msg = mysql_error(&conn->handle_);
-                throw std::runtime_error(error_msg);
+                return std::string(mysql_error(&conn->handle_));
             }
 
             return conn;
@@ -299,7 +308,7 @@ namespace ct_sql
             size_t attempts = 0;
             while (attempts <= MaxReconnectAttempts)
             {
-                if (mysql_real_query(&this->handle_, query.data(), (unsigned long)query.size()))
+                if (mysql_real_query(&this->handle_, query.data(), static_cast<unsigned long>(query.size())))
                 {
                     if (allow_reconnects_ && is_connection_lost(mysql_errno(&this->handle_)))
                     {
@@ -342,32 +351,47 @@ namespace ct_sql
             return std::string(mysql_error(&this->handle_));
         }
 
-        template <bool CheckArgCount = false, typename... Args>
-        inline CtResult<MYSQL_STMT*> base_prepared_query(const char* query, bool do_cache, Args&&... args)
+        template <bool CheckArgCount = false, typename TString, typename... Args>
+        inline CtResult<MYSQL_STMT*> base_prepared_query(TString query, bool do_cache, Args&&... args)
         {
-            auto stmt = get_prepared_statement(query, do_cache);
-            if (!stmt)
+            size_t attempts = 0;
+            while (attempts <= MaxReconnectAttempts)
             {
-                return stmt;
+                auto stmt = get_prepared_statement(query, do_cache);
+                if (!stmt)
+                {
+                    return stmt;
+                }
+
+                auto res = base_prepared_query_inner<CheckArgCount>(query, stmt, args...);
+                if (res)
+                {
+                    return res.result;
+                }
+
+                if (res.error == CR_INVALID_PARAMETER_NO)
+                {
+                    return std::string("Incorrect amount of parameters passed to prepared query.");
+                }
+
+                if (!allow_reconnects_ || !is_connection_lost(res.error))
+                {
+                    break;
+                }
+
+                // Reconnect and retry the query
+                if (!reconnect())
+                {
+                    return std::string(mysql_error(&this->handle_));
+                }
+                attempts++;
             }
 
-            return base_prepared_query_inner<CheckArgCount>(query, stmt, args...);
+            return std::string(mysql_error(&this->handle_));
         }
 
         template <bool CheckArgCount = false, typename... Args>
-        inline CtResult<MYSQL_STMT*> base_prepared_query(const std::string& query, bool do_cache, Args&&... args)
-        {
-            auto stmt = get_prepared_statement(query, do_cache);
-            if (!stmt)
-            {
-                return stmt;
-            }
-
-            return base_prepared_query_inner<CheckArgCount>(query.data(), stmt, args...);
-        }
-
-        template <bool CheckArgCount = false, typename... Args>
-        inline CtResult<MYSQL_STMT*> base_prepared_query_inner(const char* query, MYSQL_STMT* stmt, Args&&... args)
+        inline CtResult<MYSQL_STMT*, unsigned int> base_prepared_query_inner(std::string_view query, MYSQL_STMT* stmt, Args&&... args)
         {
             if constexpr (CheckArgCount)
             {
@@ -376,7 +400,7 @@ namespace ct_sql
                 if (arg_count != param_count)
                 {
                     // Incorrect amount of bind parameters given to prepared SQL query
-                    return std::string("Incorrect amount of parameters passed to prepared query.");
+                    return CR_INVALID_PARAMETER_NO;
                 }
             }
 
@@ -396,62 +420,23 @@ namespace ct_sql
                 // Bind all parameters at once
                 if (mysql_stmt_bind_param(stmt, binds))
                 {
-                    std::string msg = mysql_error(&this->handle_);
-                    mysql_stmt_close(stmt);
-                    return msg;
+                    return mysql_errno(&this->handle_);
                 }
             }
 
-            size_t attempts = 0;
-            while (attempts <= MaxReconnectAttempts)
+            // Execute the statement
+            if (mysql_stmt_execute(stmt))
             {
-                // Execute the statement
-                if (mysql_stmt_execute(stmt))
-                {
-                    if (allow_reconnects_ && is_connection_lost(mysql_errno(&this->handle_)))
-                    {
-                        // Reconnect and retry the query
-                        if (!reconnect())
-                        {
-                            std::string msg = mysql_error(&this->handle_);
-                            mysql_stmt_close(stmt);
-                            return msg;
-                        }
-                        attempts++;
-                        continue;
-                    }
-
-                    std::string msg = mysql_error(&this->handle_);
-                    mysql_stmt_close(stmt);
-                    return msg;
-                }
-
-                // Store the result set on the client-side
-                if (mysql_stmt_store_result(stmt))
-                {
-                    // Only reconnect if it is a safe query for retries
-                    if (allow_reconnects_ && is_connection_lost(mysql_errno(&this->handle_)) && is_safe_retry_query(query))
-                    {
-                        // Reconnect and retry the query
-                        if (!reconnect())
-                        {
-                            std::string msg = mysql_error(&this->handle_);
-                            mysql_stmt_close(stmt);
-                            return msg;
-                        }
-                        attempts++;
-                        continue;
-                    }
-
-                    std::string msg = mysql_error(&this->handle_);
-                    mysql_stmt_close(stmt);
-                    return msg;
-                }
-
-                return stmt;
+                return mysql_errno(&this->handle_);
             }
 
-            return std::string(mysql_error(&this->handle_));
+            // Store the result set on the client-side
+            if (mysql_stmt_store_result(stmt))
+            {
+                return mysql_errno(&this->handle_);
+            }
+
+            return stmt;
         }
 
         // Lookup const char* strings in pointer cache

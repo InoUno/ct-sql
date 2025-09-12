@@ -15,16 +15,16 @@
 
 using namespace ct_sql;
 using namespace testing;
+using namespace std::chrono_literals;
 
 std::unique_ptr<MySqlConnection> g_conn;
 
-static std::unique_ptr<MySqlConnection> get_db_connection()
+static std::unique_ptr<MySqlConnection> get_db_connection(const char* db = nullptr)
 {
     const auto user     = std::getenv("CT_SQL_USER");
     const auto password = std::getenv("CT_SQL_PASSWORD");
     const auto host     = std::getenv("CT_SQL_HOST");
     const auto port     = std::getenv("CT_SQL_PORT");
-    const auto db       = std::getenv("CT_SQL_DATABASE");
 
     try
     {
@@ -253,6 +253,52 @@ TEST(InvalidQueries, MissingArgument)
     ASSERT_FALSE(res);
 }
 
+TEST(Reconnect, ConnectionTimeoutPrepared)
+{
+    auto conn = get_db_connection("__ct_sql_test");
+
+    // Verify it's connected
+    ASSERT_TRUE(conn->ping());
+
+    // Set a 1 second timeout for the connection
+    ASSERT_TRUE(conn->prepared<"SET SESSION wait_timeout = 1;">());
+
+    auto res = conn->prepared<"SELECT small FROM __ct_sql_test_rows;">();
+    ASSERT_TRUE(res);
+
+    // Wait for connection timeout
+    std::this_thread::sleep_for(1.5s);
+
+    // Verify it's been disconnected
+    ASSERT_FALSE(conn->ping());
+
+    res = conn->prepared<"SELECT small FROM __ct_sql_test_rows;">();
+    ASSERT_TRUE(res);
+}
+
+TEST(Reconnect, ConnectionTimeoutExecute)
+{
+    auto conn = get_db_connection("__ct_sql_test");
+
+    // Verify it's connected
+    ASSERT_TRUE(conn->ping());
+
+    // Set a 1 second timeout for the connection
+    ASSERT_TRUE(conn->execute<"SET SESSION wait_timeout = 1;">());
+
+    auto res = conn->execute<"SELECT small FROM __ct_sql_test_rows;">();
+    ASSERT_TRUE(res);
+
+    // Wait for connection timeout
+    std::this_thread::sleep_for(1.5s);
+
+    // Verify it's been disconnected
+    ASSERT_FALSE(conn->ping());
+
+    res = conn->execute<"SELECT small FROM __ct_sql_test_rows;">();
+    ASSERT_TRUE(res);
+}
+
 TEST(StringLiteral, Concatenation)
 {
     constexpr auto first = StringLiteral("SELECT tiny,");
@@ -279,7 +325,7 @@ static void setup_database(MySqlConnection* conn)
         throw std::runtime_error(std::format("Error during query: {}", res.error));
     }
 
-    if (auto res = conn->execute("USE __ct_sql_test;"); !res)
+    if (auto res = conn->use_database("__ct_sql_test"); !res)
     {
         throw std::runtime_error(std::format("Error during query: {}", res.error));
     }

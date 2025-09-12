@@ -224,9 +224,9 @@ namespace ct_sql
             return static_cast<bool>(result);
         }
 
-        inline operator TResult() const
+        inline operator TResult()
         {
-            return result;
+            return std::move(result);
         }
 
         inline TResult& operator*()
