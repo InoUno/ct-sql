@@ -66,10 +66,6 @@ namespace ct_sql
             }
         }
 
-        // Non-copyable
-        MySqlBinaryResultSetRuntime(const MySqlBinaryResultSetRuntime&) = delete;
-        MySqlBinaryResultSetRuntime& operator=(const MySqlBinaryResultSetRuntime&) = delete;
-
         // Movable
         inline MySqlBinaryResultSetRuntime(MySqlBinaryResultSetRuntime&& other) noexcept
         : stmt_(other.stmt_)

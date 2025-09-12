@@ -23,13 +23,5 @@ namespace ct_sql
         , MySqlRuntimeRowBase<MySqlTextRowRuntime>(column_map)
         {
         }
-
-        // Non-copyable
-        MySqlTextRowRuntime(const MySqlTextRowRuntime&) = delete;
-        MySqlTextRowRuntime& operator=(const MySqlTextRowRuntime&) = delete;
-
-        // Non-movable
-        inline MySqlTextRowRuntime(MySqlTextRowRuntime&& other) = delete;
-        inline MySqlTextRowRuntime& operator=(MySqlTextRowRuntime&& other) = delete;
     };
 }

@@ -56,10 +56,6 @@ namespace ct_sql
             }
         }
 
-        // Non-copyable
-        MySqlTextResultSetRuntime(const MySqlTextResultSetRuntime&)            = delete;
-        MySqlTextResultSetRuntime& operator=(const MySqlTextResultSetRuntime&) = delete;
-
         // Movable
         inline MySqlTextResultSetRuntime(MySqlTextResultSetRuntime&& other) noexcept
         : result_(other.result_)

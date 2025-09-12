@@ -25,13 +25,5 @@ namespace ct_sql
         , MySqlRuntimeRowBase<MySqlBinaryRowRuntime>(column_map)
         {
         }
-
-        // Non-copyable
-        MySqlBinaryRowRuntime(const MySqlBinaryRowRuntime&) = delete;
-        MySqlBinaryRowRuntime& operator=(const MySqlBinaryRowRuntime&) = delete;
-
-        // Non-movable
-        inline MySqlBinaryRowRuntime(MySqlBinaryRowRuntime&& other) = delete;
-        inline MySqlBinaryRowRuntime& operator=(MySqlBinaryRowRuntime&& other) = delete;
     };
 }

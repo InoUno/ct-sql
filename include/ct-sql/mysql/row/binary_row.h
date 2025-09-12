@@ -19,22 +19,11 @@ namespace ct_sql
     template <StringLiteral Query>
     class MySqlBinaryRow : public MySqlBinaryRowBase, public MySqlComptimeRowBase<MySqlBinaryRow<Query>, Query>
     {
-    private:
-        using QueryColumns = ParseColumns<Query>;
-
     public:
         inline explicit MySqlBinaryRow(MYSQL_STMT* stmt, MYSQL_FIELD* fields, MYSQL_BIND& bind, std::unordered_map<std::string, size_t>& column_map)
         : MySqlBinaryRowBase(stmt, fields, bind)
         , MySqlComptimeRowBase<MySqlBinaryRow<Query>, Query>(fields, column_map)
         {
         }
-
-        // Non-copyable
-        MySqlBinaryRow(const MySqlBinaryRow&) = delete;
-        MySqlBinaryRow& operator=(const MySqlBinaryRow&) = delete;
-
-        // Non-movable
-        inline MySqlBinaryRow(MySqlBinaryRow&& other) = delete;
-        inline MySqlBinaryRow& operator=(MySqlBinaryRow&& other) = delete;
     };
 }
