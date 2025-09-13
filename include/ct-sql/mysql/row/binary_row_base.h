@@ -29,11 +29,33 @@ namespace ct_sql
 
         // Copyable
         MySqlBinaryRowBase(const MySqlBinaryRowBase&) = default;
-        MySqlBinaryRowBase& operator=(const MySqlBinaryRowBase&) = default;
+
+        MySqlBinaryRowBase& operator=(const MySqlBinaryRowBase& other)
+        {
+            if (this != &other)
+            {
+                this->stmt_   = other.stmt_;
+                this->fields_ = other.fields_;
+                this->bind_   = other.bind_;
+            }
+
+            return *this;
+        }
 
         // Movable
         inline MySqlBinaryRowBase(MySqlBinaryRowBase&& other) = default;
-        inline MySqlBinaryRowBase& operator=(MySqlBinaryRowBase&& other) = default;
+
+        inline MySqlBinaryRowBase& operator=(MySqlBinaryRowBase&& other)
+        {
+            this->stmt_   = other.stmt_;
+            this->fields_ = other.fields_;
+            this->bind_   = other.bind_;
+
+            other.stmt_   = nullptr;
+            other.fields_ = nullptr;
+
+            return *this;
+        }
 
         template <typename T>
         inline T get_unchecked(size_t index) const
