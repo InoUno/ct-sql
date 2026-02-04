@@ -86,6 +86,118 @@ TEST(Select, StringsAndFloats)
     EXPECT_THAT(row->get(1), Not(IsFloatSame(6.0f)));
 }
 
+TEST(Select, ExplicitTypeChange)
+{
+    auto res = g_conn->prepared<"SELECT CAST(tiny / 100 AS FLOAT) AS tinyDiv FROM __ct_sql_test_rows LIMIT 1;">();
+    ASSERT_TRUE(res);
+
+    auto row = res->next();
+    ASSERT_TRUE(row);
+
+    float val = row->get<"tinyDiv">();
+
+    EXPECT_THAT(row->get<"tinyDiv">(), IsFloatSame(0.01f));
+}
+
+TEST(Select, ImplicitTypeChange)
+{
+    auto res = g_conn->prepared<"SELECT tiny / 100 AS tinyDiv FROM __ct_sql_test_rows LIMIT 1;">();
+    ASSERT_TRUE(res);
+
+    auto row = res->next();
+    ASSERT_TRUE(row);
+
+    float val = row->get<"tinyDiv">();
+
+    EXPECT_THAT(row->get<"tinyDiv">(), IsFloatSame(0.01f));
+}
+
+TEST(Select, TimeRelated)
+{
+    auto res = g_conn->prepared<"SELECT timestampy, datey, datetimey FROM __ct_sql_test_rows LIMIT 1;">();
+    ASSERT_TRUE(res);
+
+    auto row = res->next();
+    ASSERT_TRUE(row);
+
+    // Verify tm structs
+    auto check_date = [](const tm& datetime)
+    {
+        ASSERT_EQ(datetime.tm_year, 100);
+        ASSERT_EQ(datetime.tm_mon, 0);
+        ASSERT_EQ(datetime.tm_mday, 2);
+        ASSERT_EQ(datetime.tm_hour, 0);
+        ASSERT_EQ(datetime.tm_min, 0);
+        ASSERT_EQ(datetime.tm_sec, 0);
+    };
+
+    auto check_datetime = [](const tm& datetime)
+    {
+        ASSERT_EQ(datetime.tm_year, 100);
+        ASSERT_EQ(datetime.tm_mon, 0);
+        ASSERT_EQ(datetime.tm_mday, 2);
+        ASSERT_EQ(datetime.tm_hour, 12);
+        ASSERT_EQ(datetime.tm_min, 34);
+        ASSERT_EQ(datetime.tm_sec, 56);
+    };
+
+    tm tm_timestamp = row->get<"timestampy">();
+    check_datetime(tm_timestamp);
+
+    tm tm_date = row->get<"datey">();
+    check_date(tm_date);
+
+    tm tm_datetime = row->get<"datetimey">();
+    check_datetime(tm_datetime);
+
+    // Check system_clock time points
+    using system_clock = std::chrono::system_clock;
+    using time_point   = system_clock::time_point;
+
+    time_point tp_timestamp = row->get<"timestampy">();
+    time_point tp_date      = row->get<"datey">();
+    time_point tp_datetime  = row->get<"datetimey">();
+
+    ASSERT_EQ(tp_timestamp, tp_datetime);
+    ASSERT_NE(tp_date, tp_datetime);
+
+    auto check_tp_datetime = [&check_datetime](const time_point& tp)
+    {
+        auto tt = system_clock::to_time_t(tp);
+        tm tm   = *gmtime(&tt);
+        check_datetime(tm);
+    };
+    auto check_tp_date = [&check_date](const time_point& tp)
+    {
+        auto tt = system_clock::to_time_t(tp);
+        tm tm   = *gmtime(&tt);
+        check_date(tm);
+    };
+
+    check_tp_datetime(tp_timestamp);
+    check_tp_datetime(tp_datetime);
+    check_tp_date(tp_date);
+
+    // Check raw timestamps
+
+    long long ts_timestamp = row->get<"timestampy">();
+    long long ts_date      = row->get<"datey">();
+    long long ts_datetime  = row->get<"datetimey">();
+
+    ASSERT_EQ(ts_timestamp, ts_datetime);
+    ASSERT_NE(ts_date, ts_datetime);
+
+    // Compare raw timestamps and time points
+    auto to_timestamp = [](time_point t)
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>(t.time_since_epoch()).count();
+    };
+
+    ASSERT_EQ(to_timestamp(tp_timestamp), ts_timestamp);
+    ASSERT_EQ(to_timestamp(tp_date), ts_date);
+    ASSERT_EQ(to_timestamp(tp_datetime), ts_datetime);
+}
+
 TEST(Select, Wildcard)
 {
     auto res = g_conn->prepared<"SELECT * FROM __ct_sql_test_rows LIMIT 1;">();
@@ -227,6 +339,20 @@ TEST(Prepared, CachingControl)
     EXPECT_EQ(res2->get_row_count(), 5);
 }
 
+TEST(Prepared, OverlappingDataRetrieval)
+{
+    auto res = g_conn->prepared_uncached<"SELECT firstname, tiny, lastname FROM __ct_sql_test_rows LIMIT 1;">();
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->get_row_count(), 1);
+
+    auto row = res->next();
+    ASSERT_TRUE(row);
+
+    // Getting a value as a type with a larger size (4 bytes for int32_t) than the database field (tiny field is only 1 byte)
+    // should not result in it grabbing too many bytes from other nearby fields.
+    EXPECT_EQ((row->get<"tiny", int32_t>()), 1);
+}
+
 TEST(InvalidQueries, BadQuery)
 {
     auto res = g_conn->execute("not a valid query;");
@@ -349,6 +475,9 @@ static void setup_database(MySqlConnection* conn)
         "  `doubley` double(8,5) not null default '0',"
         "  `blobby` blob(16) null,"
         "  `maybe_null` int(10) null default null,"
+        "  `timestampy` TIMESTAMP not null default CURRENT_TIMESTAMP,"
+        "  `datey` DATE not null default CURRENT_TIMESTAMP,"
+        "  `datetimey` DATETIME not null default CURRENT_TIMESTAMP,"
         "  PRIMARY KEY (`id`)"
         ");");
 
@@ -360,7 +489,7 @@ static void setup_database(MySqlConnection* conn)
     // Populate the table
     for (size_t i = 0; i < 10; i++)
     {
-        if (auto res = conn->prepared("INSERT INTO __ct_sql_test_rows VALUES(?, \"John\", \"Doe\", 1, 2, 3, 5.0, 10.0, 0x000102030405060708090A0B0C0D0E0F, NULL);", i); !res)
+        if (auto res = conn->prepared("INSERT INTO __ct_sql_test_rows VALUES(?, \"John\", \"Doe\", 1, 2, 3, 5.0, 10.0, 0x000102030405060708090A0B0C0D0E0F, NULL, '2000-01-02 12:34:56', '2000-01-02 12:34:56', '2000-01-02 12:34:56');", i); !res)
         {
             throw std::runtime_error(std::format("Error during query: {}", res.error));
         }
